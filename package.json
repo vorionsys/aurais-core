@@ -1,0 +1,56 @@
+{
+  "name": "@vorionsys/aurais-core",
+  "version": "0.1.0",
+  "description": "Shared library for the Aurais ecosystem — proof-chain (Ed25519-signed, sha256-chained event log) and CAR identity helpers. Step 1 of 3 in the aurais-mcp-* consolidation.",
+  "license": "Apache-2.0",
+  "author": "Vorion LLC <team@vorion.org>",
+  "homepage": "https://github.com/voriongit/aurais-core",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/voriongit/aurais-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/voriongit/aurais-core/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./proof-chain": {
+      "types": "./dist/proof-chain.d.ts",
+      "import": "./dist/proof-chain.js"
+    },
+    "./car-identity": {
+      "types": "./dist/car-identity.d.ts",
+      "import": "./dist/car-identity.js"
+    },
+    "./canonical-json": {
+      "types": "./dist/canonical-json.d.ts",
+      "import": "./dist/canonical-json.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}
