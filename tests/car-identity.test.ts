@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   deriveAgentIdentity,
-  TIER_CEILING,
+  OBSERVATION_CEILING,
+  OBSERVATION_MAX_TIER,
   TIER_NAME,
   type DeriveInput,
 } from "../src/car-identity.js";
@@ -11,24 +12,30 @@ const SAMPLE: DeriveInput = {
   version: "0.1.0",
   name: "Test Bot",
   tier: 3,
+  observationClass: "BLACK_BOX",
   maxEarnableTier: 4,
   capabilities: ["tool:read", "data:read:public"],
 };
 
-describe("TIER_CEILING and TIER_NAME", () => {
-  it("matches canonical.ts ceilings", () => {
-    expect(TIER_CEILING[0]).toBe(200);
-    expect(TIER_CEILING[3]).toBe(600); // BLACK_BOX
-    expect(TIER_CEILING[4]).toBe(750); // GRAY_BOX
-    expect(TIER_CEILING[5]).toBe(900); // WHITE_BOX
-    expect(TIER_CEILING[6]).toBe(950); // ATTESTED_BOX
-    expect(TIER_CEILING[7]).toBe(1000); // VERIFIED_BOX
+describe("OBSERVATION_CEILING and TIER_NAME", () => {
+  it("matches canonical.ts observation ceilings", () => {
+    expect(OBSERVATION_CEILING.BLACK_BOX).toBe(600);
+    expect(OBSERVATION_CEILING.GRAY_BOX).toBe(750);
+    expect(OBSERVATION_CEILING.WHITE_BOX).toBe(900);
+    expect(OBSERVATION_CEILING.ATTESTED_BOX).toBe(950);
+    expect(OBSERVATION_CEILING.VERIFIED_BOX).toBe(1000);
   });
 
-  it("has consistent tier names", () => {
-    expect(TIER_NAME[0]).toBe("PROVISIONING");
-    expect(TIER_NAME[3]).toBe("BLACK_BOX");
-    expect(TIER_NAME[7]).toBe("VERIFIED_BOX");
+  it("maps observation class to a max earnable tier", () => {
+    expect(OBSERVATION_MAX_TIER.BLACK_BOX).toBe(3);
+    expect(OBSERVATION_MAX_TIER.GRAY_BOX).toBe(4);
+    expect(OBSERVATION_MAX_TIER.VERIFIED_BOX).toBe(7);
+  });
+
+  it("uses the earned-trust-tier names (orthogonal to observation class)", () => {
+    expect(TIER_NAME[0]).toBe("Sandbox");
+    expect(TIER_NAME[3]).toBe("Monitored");
+    expect(TIER_NAME[7]).toBe("Autonomous");
   });
 });
 
@@ -52,12 +59,16 @@ describe("deriveAgentIdentity", () => {
     expect(id.orgId).toBe("vorion-llc");
     expect(id.contextHash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(id.parentHash).toBe("");
+    expect(id.observationClass).toBe("BLACK_BOX");
+    // Ceiling derives from the observation class, not the trust tier.
     expect(id.trustCeiling).toBe(600);
     expect(id.startingTier).toBe(0);
-    expect(id.maxEarnableTier).toBe(4);
+    // maxEarnableTier is clamped to the observation-class max (BLACK_BOX -> 3),
+    // even though the input requested 4.
+    expect(id.maxEarnableTier).toBe(3);
     expect(id.currentTier).toBe(3);
     expect(id.capabilities).toEqual(["tool:read", "data:read:public"]);
-    expect(id.registrationStatus).toBe("offline-attested");
+    expect(id.registrationStatus).toBe("self-asserted");
   });
 
   it("produces a stable carId for the same input", () => {
@@ -65,6 +76,14 @@ describe("deriveAgentIdentity", () => {
     const b = deriveAgentIdentity(SAMPLE);
     expect(a.carId).toBe(b.carId);
     expect(a.contextHash).toBe(b.contextHash);
+  });
+
+  it("binds observationClass into the digest — a class change yields a new carId", () => {
+    const blackBox = deriveAgentIdentity(SAMPLE);
+    const grayBox = deriveAgentIdentity({ ...SAMPLE, observationClass: "GRAY_BOX" });
+    expect(grayBox.carId).not.toBe(blackBox.carId);
+    expect(grayBox.contextHash).not.toBe(blackBox.contextHash);
+    expect(grayBox.trustCeiling).toBe(750);
   });
 
   it("produces a different operationId on each call", () => {
@@ -106,14 +125,16 @@ describe("deriveAgentIdentity", () => {
     expect(id.orgId).toBe("test-org");
   });
 
-  it("defaults maxEarnableTier to current tier when omitted", () => {
+  it("defaults maxEarnableTier to the observation-class max when omitted", () => {
     const id = deriveAgentIdentity({
       slug: "x",
       version: "0.1.0",
       name: "X",
       tier: 2,
+      observationClass: "GRAY_BOX",
       capabilities: [],
     });
-    expect(id.maxEarnableTier).toBe(2);
+    // GRAY_BOX max earnable tier is 4; no explicit maxEarnableTier provided.
+    expect(id.maxEarnableTier).toBe(4);
   });
 });

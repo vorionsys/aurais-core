@@ -10,8 +10,9 @@ describe("public API surface", () => {
 
   it("exports the car-identity primitives", () => {
     expect(typeof core.deriveAgentIdentity).toBe("function");
-    expect(core.TIER_CEILING[3]).toBe(600);
-    expect(core.TIER_NAME[3]).toBe("BLACK_BOX");
+    expect(core.OBSERVATION_CEILING.BLACK_BOX).toBe(600);
+    expect(core.OBSERVATION_MAX_TIER.BLACK_BOX).toBe(3);
+    expect(core.TIER_NAME[3]).toBe("Monitored");
   });
 
   it("exports the canonical-json helpers", () => {
