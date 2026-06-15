@@ -4,50 +4,77 @@
  * The full @vorionsys/car-client library is a registry-backed SDK that expects
  * a live backend (api.agentanchorai.com) for agent registration, role-gate
  * evaluation, ceiling checks, and tier progression. Aurais consumers (the
- * Next app + the five aurais-mcp-* packages) don't have that backend stood
- * up yet, so they can't register bots live.
+ * Next app + the aurais-mcp-* packages) don't have that backend stood up yet,
+ * so they can't register bots live.
  *
  * What we CAN do offline:
- *   - Derive a deterministic CAR ID from (bot_slug, bot_version, manifest_hash)
+ *   - Derive a deterministic CAR ID from (slug, version, manifest_hash) where
+ *     the manifest binds the bot's tier, observation class, and capabilities
  *   - Generate a fresh operationId per run
- *   - Compute a contextHash over the bot's declared capabilities + tier
+ *   - Compute a contextHash over the bot's declared manifest fields
  *   - Emit these fields in the proof chain, shape-matching the CAR spec
  *
- * When the backend lands, we add a registration step in the bot bootstrap
- * flow that submits this same agent context and gets a signed registration
- * record back. All the existing proof-chain events remain compatible.
+ * Trust model — two orthogonal axes (mirrors canonical.ts in
+ * vorion/packages/basis/src/canonical.ts):
+ *   - TRUST TIER (T0–T7): what an agent has *earned* through demonstrated
+ *     behavior. Names in TIER_NAME.
+ *   - OBSERVATION CLASS: how inspectable the agent is. This sets the trust
+ *     score ceiling (OBSERVATION_CEILING) and the maximum earnable tier
+ *     (OBSERVATION_MAX_TIER). "You cannot fully trust what you cannot fully
+ *     inspect."
  *
- * Source: extracted (with deploymentId resolver widened to cover both the
- * Next app's Vercel env and the MCPs' stdio env) from voriongit/aurais
- * src/lib/car-identity.ts @ be55bf0fffc4254c4f77da03a99a272f5bb7cd5e
- * on 2026-04-25.
+ * The observation class is bound into the manifest digest, so a change of
+ * class yields a different contextHash (and CAR ID).
+ *
+ * History: originally a tier-only model. Unified to the observation-class
+ * model (the canonical split, already live in the Aurais Next app) so every
+ * consumer derives identity the same way. See README.md.
  */
 
 import { canonicalJSON, sha256 } from "./canonical-json.js";
 
 export type TrustTier = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-// Observation ceilings per canonical.ts (packages/basis/src/canonical.ts).
-export const TIER_CEILING: Record<TrustTier, number> = {
-  0: 200,
-  1: 300,
-  2: 450,
-  3: 600, // BLACK_BOX
-  4: 750, // GRAY_BOX
-  5: 900, // WHITE_BOX
-  6: 950, // ATTESTED_BOX
-  7: 1000, // VERIFIED_BOX
+/**
+ * TRUST tier names — what an agent has earned. Orthogonal to observation
+ * class. Exact mirror of canonical TRUST_TIERS.
+ */
+export const TIER_NAME: Record<TrustTier, string> = {
+  0: "Sandbox",
+  1: "Observed",
+  2: "Provisional",
+  3: "Monitored",
+  4: "Standard",
+  5: "Trusted",
+  6: "Certified",
+  7: "Autonomous",
 };
 
-export const TIER_NAME: Record<TrustTier, string> = {
-  0: "PROVISIONING",
-  1: "INITIATED",
-  2: "OBSERVED",
-  3: "BLACK_BOX",
-  4: "GRAY_BOX",
-  5: "WHITE_BOX",
-  6: "ATTESTED_BOX",
-  7: "VERIFIED_BOX",
+/**
+ * OBSERVATION class — the axis that sets the trust-score ceiling. Mirrors
+ * canonical OBSERVATION_TIERS. Distinct from the earned trust tier (T0–T7).
+ */
+export type ObservationClass =
+  | "BLACK_BOX"
+  | "GRAY_BOX"
+  | "WHITE_BOX"
+  | "ATTESTED_BOX"
+  | "VERIFIED_BOX";
+
+export const OBSERVATION_CEILING: Record<ObservationClass, number> = {
+  BLACK_BOX: 600,
+  GRAY_BOX: 750,
+  WHITE_BOX: 900,
+  ATTESTED_BOX: 950,
+  VERIFIED_BOX: 1000,
+};
+
+export const OBSERVATION_MAX_TIER: Record<ObservationClass, TrustTier> = {
+  BLACK_BOX: 3,
+  GRAY_BOX: 4,
+  WHITE_BOX: 6,
+  ATTESTED_BOX: 6,
+  VERIFIED_BOX: 7,
 };
 
 export type AgentIdentity = {
@@ -65,25 +92,30 @@ export type AgentIdentity = {
   contextHash: string;
   /** Parent registration hash. "" for root agents owned by Vorion LLC. */
   parentHash: string;
-  /** Trust ceiling (score cap) this tier allows. */
+  /** Observation-class-derived trust-score ceiling. */
   trustCeiling: number;
+  /** Observation class — the axis that sets the ceiling. */
+  observationClass: ObservationClass;
   /** Starting tier — per spec, all bots begin at T0 until onboarding. */
   startingTier: TrustTier;
-  /** Max tier this bot is approved to reach. */
+  /** Max tier this bot is approved to reach (clamped to the observation-class max). */
   maxEarnableTier: TrustTier;
-  /** Tier this bot is currently operating at (for offline-attested bots, the required runtime tier). */
+  /** Tier this bot is currently operating at (for self-asserted bots, the required runtime tier). */
   currentTier: TrustTier;
   /** Capabilities declared in the manifest. */
   capabilities: string[];
   /** Status label for the UI — reflects that live registration is pending backend. */
-  registrationStatus: "offline-attested" | "registered" | "pending";
+  registrationStatus: "self-asserted" | "registered" | "pending";
 };
 
 export type DeriveInput = {
   slug: string;
   version: string;
   name: string;
+  /** Current operating trust tier. */
   tier: TrustTier;
+  /** Observation class — sets the ceiling and the maximum earnable tier. */
+  observationClass: ObservationClass;
   maxEarnableTier?: TrustTier;
   capabilities: string[];
   orgId?: string;
@@ -97,13 +129,15 @@ export type DeriveInput = {
  *   3. VERCEL_GIT_COMMIT_SHA — Vercel commit SHA, first 12 chars
  *   4. mcp-local-${platform}-${arch} — MCP local-dev fallback
  *   5. "local-dev" — last-resort
+ *
+ * Note: deploymentId is runtime context only — it is NOT part of the manifest
+ * digest, so it never affects carId / contextHash.
  */
 function resolveDeploymentId(): string {
   if (process.env.AURAIS_DEPLOYMENT_ID) return process.env.AURAIS_DEPLOYMENT_ID;
   if (process.env.VERCEL_DEPLOYMENT_ID) return process.env.VERCEL_DEPLOYMENT_ID;
   const sha = process.env.VERCEL_GIT_COMMIT_SHA;
   if (sha) return sha.slice(0, 12);
-  // Process is always available in Node — both Vercel functions and stdio MCPs.
   if (process.platform && process.arch) {
     return `mcp-local-${process.platform}-${process.arch}`;
   }
@@ -118,18 +152,20 @@ export function deriveAgentIdentity(input: DeriveInput): AgentIdentity {
   const orgId = input.orgId ?? "vorion-llc";
   const deploymentId = resolveDeploymentId();
 
-  // Canonical manifest digest (deterministic, version-pinned)
+  // Canonical manifest digest (deterministic, version-pinned). observationClass
+  // is bound in so a change of class produces a different contextHash / CAR ID.
   const manifestBlob = canonicalJSON({
     slug: input.slug,
     version: input.version,
     name: input.name,
     tier: input.tier,
+    observationClass: input.observationClass,
     capabilities: [...input.capabilities].sort(),
     orgId,
   });
   const contextHash = "sha256:" + sha256(manifestBlob);
 
-  // CAR ID shape: car-<slug>-<12chars of context+org>
+  // CAR ID shape: car-<slug>-<12 chars of context+org>
   const carHashShort = sha256(contextHash + orgId).slice(0, 12);
   const carId = `car-${input.slug}-${carHashShort}`;
 
@@ -139,8 +175,11 @@ export function deriveAgentIdentity(input: DeriveInput): AgentIdentity {
   // Fresh op ID per call
   const operationId = sha256(carId + Date.now() + Math.random()).slice(0, 16);
 
-  const trustCeiling = TIER_CEILING[input.tier];
-  const maxEarnableTier = input.maxEarnableTier ?? input.tier;
+  // Ceiling and max earnable tier are functions of OBSERVATION class, not the
+  // (earned) trust tier.
+  const trustCeiling = OBSERVATION_CEILING[input.observationClass];
+  const obsMax = OBSERVATION_MAX_TIER[input.observationClass];
+  const maxEarnableTier = Math.min(input.maxEarnableTier ?? obsMax, obsMax) as TrustTier;
 
   return {
     carId,
@@ -151,11 +190,12 @@ export function deriveAgentIdentity(input: DeriveInput): AgentIdentity {
     contextHash,
     parentHash: "", // root
     trustCeiling,
+    observationClass: input.observationClass,
     startingTier: 0,
     maxEarnableTier,
     currentTier: input.tier,
     capabilities: input.capabilities,
     // Flip to "registered" once the backend lands and we call CARClient.registerAgent.
-    registrationStatus: "offline-attested",
+    registrationStatus: "self-asserted",
   };
 }

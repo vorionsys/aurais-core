@@ -5,7 +5,8 @@
  *  - Proof chain: ProofChain class, ProofEvent / EventAction types,
  *    hashText / hashJSON helpers
  *  - CAR identity: deriveAgentIdentity, AgentIdentity / DeriveInput / TrustTier
- *    types, TIER_CEILING / TIER_NAME tables
+ *    / ObservationClass types, TIER_NAME / OBSERVATION_CEILING /
+ *    OBSERVATION_MAX_TIER tables
  *  - Canonical JSON: canonicalJSON serializer + sha256 helper (re-exported
  *    so callers can produce digests that match what the lib produces)
  *
@@ -26,8 +27,10 @@ export {
   type AgentIdentity,
   type DeriveInput,
   type TrustTier,
-  TIER_CEILING,
+  type ObservationClass,
   TIER_NAME,
+  OBSERVATION_CEILING,
+  OBSERVATION_MAX_TIER,
 } from "./car-identity.js";
 
 export { canonicalJSON, sha256 } from "./canonical-json.js";
