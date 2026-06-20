@@ -1,6 +1,6 @@
 {
   "name": "@vorionsys/aurais-core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Shared library for the Aurais ecosystem — proof-chain (Ed25519-signed, sha256-chained event log) and CAR identity helpers. Step 1 of 3 in the aurais-mcp-* consolidation.",
   "license": "Apache-2.0",
   "author": "Vorion LLC <team@vorion.org>",
