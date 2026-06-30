@@ -1,40 +1,48 @@
 name: Release
 
-# Publishes @vorionsys/aurais-core to npm with a Sigstore/SLSA provenance
-# attestation via tokenless OIDC trusted publishing. Ring-3 of the ecosystem
-# conformance ladder flagged this package as published WITHOUT provenance —
-# this workflow closes that gap on the next tagged release (vX.Y.Z).
-#
-# Prereq: configure aurais-core as a trusted publisher for @vorionsys/aurais-core
-# on npmjs.com (Settings -> Publishing access -> GitHub Actions), so no NPM_TOKEN
-# is needed and provenance is attached automatically.
+# Publishes packages whenever a Changesets "Version Packages" PR is merged to main.
+# - Builds, then either opens/updates the version PR or publishes the pending releases.
+# - Every publish carries npm provenance (Sigstore-backed, verifiable on npmjs.com).
 
 on:
   push:
-    tags: ["v*"]
-  workflow_dispatch: {}
+    branches: [main]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: read
-  id-token: write # required for npm provenance (tokenless OIDC)
+  contents: write        # create the Version Packages PR / tags
+  pull-requests: write   # open/update that PR
+  id-token: write        # REQUIRED: OIDC token for npm provenance / trusted publishing
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Changesets needs full history
+
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: npm
-          registry-url: "https://registry.npmjs.org"
-      - name: Update npm (trusted publishing requires npm >= 11.5.1)
-        run: npm install -g npm@latest
-      - name: Install
-        run: npm ci
-      - name: Build (if present)
-        run: npm run build --if-present
-      - name: Test (if present)
-        run: npm test --if-present
-      - name: Publish (tokenless OIDC, provenance)
-        run: npm publish --provenance --access public
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"  # writes the auth line provenance needs
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # Verifies registry signatures + provenance of installed deps before we publish more.
+      - run: npm audit signatures
+
+      - name: Create Release PR or publish
+        uses: changesets/action@v1
+        with:
+          version: npm run changeset:version
+          publish: npm run changeset:release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # If you use a granular automation token, keep this. If you switch the package(s)
+          # to npm Trusted Publishing (OIDC, no token), you can delete NODE_AUTH_TOKEN.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
