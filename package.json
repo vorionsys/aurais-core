@@ -4,13 +4,16 @@
   "description": "Shared library for the Aurais ecosystem — proof-chain (Ed25519-signed, sha256-chained event log) and CAR identity helpers. Step 1 of 3 in the aurais-mcp-* consolidation.",
   "license": "Apache-2.0",
   "author": "Vorion LLC <team@vorion.org>",
-  "homepage": "https://github.com/voriongit/aurais-core",
+  "homepage": "https://vorion.org",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/voriongit/aurais-core.git"
+    "url": "git+https://github.com/vorionsys/aurais-core.git"
   },
   "bugs": {
-    "url": "https://github.com/voriongit/aurais-core/issues"
+    "url": "https://github.com/vorionsys/aurais-core/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
