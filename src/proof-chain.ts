@@ -16,8 +16,6 @@
  *    invocations reuse it). This is fine for the BYOK demo; production
  *    bots will load a managed key from a KMS-style secret store.
  *
- * Source: extracted unchanged from voriongit/aurais src/lib/proof-chain.ts
- * @ be55bf0fffc4254c4f77da03a99a272f5bb7cd5e on 2026-04-25.
  */
 
 import {

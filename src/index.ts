@@ -10,8 +10,6 @@
  *  - Canonical JSON: canonicalJSON serializer + sha256 helper (re-exported
  *    so callers can produce digests that match what the lib produces)
  *
- * Source: extracted from voriongit/aurais src/lib/{proof-chain,car-identity}.ts
- * @ be55bf0fffc4254c4f77da03a99a272f5bb7cd5e — see README.md.
  */
 
 export {

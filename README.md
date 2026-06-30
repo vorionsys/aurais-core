@@ -33,15 +33,12 @@ the marketing surface ever requires it is a one-pass change.
 ## Three-step consolidation — this is step 1
 
 1. **Step 1 (this repo):** extract the canonical lib into a standalone
-   package with tests + CI. Source: `voriongit/aurais` `src/lib/` at
-   `be55bf0fffc4254c4f77da03a99a272f5bb7cd5e`.
-2. **Step 2:** update `voriongit/aurais` and the five
-   `voriongit/vorion/packages/aurais-mcp-*` packages to consume from
+   package with tests + CI.
+2. **Step 2:** update downstream Aurais consumers to pull from
    `@vorionsys/aurais-core` instead of their local copies. Per-bot
-   `*_IDENTITY` constants stay in each MCP package — they're per-bot config,
+   `*_IDENTITY` constants stay in each consumer — they're per-bot config,
    not shared.
-3. **Step 3:** land the MCP packages in their final home (likely individual
-   polyrepos under `voriongit/`, decided in step-2 review).
+3. **Step 3:** land the MCP packages in their final homes.
 
 ## Install
 
@@ -194,21 +191,10 @@ function sha256(text: string): string;           // hex
   `@vorionsys/car-client` registers against the AgentAnchor backend); when
   that backend lands the lib should grow a `registerAgent()` shim that
   flips `registrationStatus` from `offline-attested` to `registered`.
-- **No tests existed in `voriongit/aurais` for these files** before this
-  extraction — the test suite here is the first one. Step-2 fold-in should
-  add an integration test in each consumer that exercises a
+- **The test suite here is the first one for these files.** Step-2 fold-in
+  should add an integration test in each consumer that exercises a
   round-trip-and-verify against this lib.
-
-## Provenance
-
-| File                  | Source                                                                                       |
-| --------------------- | -------------------------------------------------------------------------------------------- |
-| `src/proof-chain.ts`  | `voriongit/aurais` `src/lib/proof-chain.ts` @ `be55bf0fffc4254c4f77da03a99a272f5bb7cd5e`     |
-| `src/car-identity.ts` | `voriongit/aurais` `src/lib/car-identity.ts` @ `be55bf0fffc4254c4f77da03a99a272f5bb7cd5e` (+ widened `deploymentId` resolver) |
-| `src/canonical-json.ts` | Extracted to dedupe within-package; same canonical-JSON algorithm used by both source files |
-| `LICENSE`             | `voriongit/basis-spec-docs` `LICENSE` (canonical Apache-2.0 text)                            |
 
 ## Repo
 
-[github.com/voriongit/aurais-core](https://github.com/voriongit/aurais-core)
-— private during step-1 / step-2; visibility decision to be revisited at step 3.
+[github.com/vorionsys/aurais-core](https://github.com/vorionsys/aurais-core)

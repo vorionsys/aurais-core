@@ -1,21 +1,10 @@
 /**
  * Offline CAR identity derivation.
  *
- * The full @vorionsys/car-client library is a registry-backed SDK that expects
- * a live backend (api.agentanchorai.com) for agent registration, role-gate
- * evaluation, ceiling checks, and tier progression. Aurais consumers (the
- * Next app + the aurais-mcp-* packages) don't have that backend stood up yet,
- * so they can't register bots live.
+ * Derives a deterministic CAR ID from (slug, version, manifest_hash) where
+ * the manifest binds the bot's tier, observation class, and capabilities.
  *
- * What we CAN do offline:
- *   - Derive a deterministic CAR ID from (slug, version, manifest_hash) where
- *     the manifest binds the bot's tier, observation class, and capabilities
- *   - Generate a fresh operationId per run
- *   - Compute a contextHash over the bot's declared manifest fields
- *   - Emit these fields in the proof chain, shape-matching the CAR spec
- *
- * Trust model — two orthogonal axes (mirrors canonical.ts in
- * vorion/packages/basis/src/canonical.ts):
+ * Trust model — two orthogonal axes:
  *   - TRUST TIER (T0–T7): what an agent has *earned* through demonstrated
  *     behavior. Names in TIER_NAME.
  *   - OBSERVATION CLASS: how inspectable the agent is. This sets the trust
@@ -25,10 +14,6 @@
  *
  * The observation class is bound into the manifest digest, so a change of
  * class yields a different contextHash (and CAR ID).
- *
- * History: originally a tier-only model. Unified to the observation-class
- * model (the canonical split, already live in the Aurais Next app) so every
- * consumer derives identity the same way. See README.md.
  */
 
 import { canonicalJSON, sha256 } from "./canonical-json.js";
