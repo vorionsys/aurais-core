@@ -28,6 +28,9 @@ jobs:
           node-version: 20
           registry-url: "https://registry.npmjs.org"  # writes the auth line provenance needs
 
+      # npm >= 11.5 required for OIDC trusted publishing (Node 20 ships npm 10.x)
+      - run: npm install -g npm@latest
+
       - run: npm ci
 
       - run: npm run build
