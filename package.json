@@ -60,7 +60,7 @@
     "@changesets/cli": "^2.31.0",
     "@types/node": "^22.19.17",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.9"
+    "vitest": "^3.2.6"
   },
   "peerDependencies": {
     "@vorionsys/basis-spec": "^1.2.0"
