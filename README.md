@@ -6,6 +6,13 @@ Shared library for the Aurais ecosystem. Provides:
 - **`deriveAgentIdentity`** — offline CAR-shaped identity derivation (deterministic ID, contextHash, tier ceiling)
 - **`canonicalJSON` / `sha256`** — the canonical-JSON serializer + hash used by both, exported for callers that need to reproduce digests
 
+> **Proof-chain format note:** Aurais chains are **single-hash (sha256)** and verify with
+> [`@vorionsys/aurais-verify`](https://www.npmjs.com/package/@vorionsys/aurais-verify) only. The BASIS
+> family ([`proof-plane`](https://github.com/vorionsys/proof-plane), `gate-core`) uses **dual-hash
+> (SHA-256 + SHA3-256)** and verifies with `@vorionsys/verify`. The two formats are not
+> cross-verifiable today; convergence is tracked in [basis-spec#17](https://github.com/vorionsys/basis-spec/issues/17), aka
+> "proof-chain format convergence." Always pair a chain with its own family's verifier.
+
 License: Apache-2.0.
 
 ---
